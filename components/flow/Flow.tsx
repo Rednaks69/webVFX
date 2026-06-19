@@ -8,10 +8,17 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   addEdge,
+  Node,
+  Edge,
+  NodeChange,
+  EdgeChange,
+  Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-const initialNodes = [
+import TextUpdaterNode from "../CustomNodes/TextUpdaterNode";
+
+const initialNodes: Node[] = [
   {
     id: "n1",
     position: { x: 400, y: 400 },
@@ -23,9 +30,17 @@ const initialNodes = [
     position: { x: 500, y: 500 },
     data: { label: "Node 2" },
   },
+  {
+    id: "n3",
+    type: "textUpdater",
+    position: { x: 700, y: 700 },
+    data: { value: "Node 2" },
+  },
 ];
 
-const initialEdges = [];
+const nodeTypes = { textUpdater: TextUpdaterNode };
+
+const initialEdges: Edge[] = [];
 
 //! //////////////////////////////////////////////////////////////
 
@@ -34,18 +49,19 @@ const Flow = () => {
   const [edges, setEdges] = useState(initialEdges);
 
   const onNodesChange = useCallback(
-    (changes) =>
+    (changes: NodeChange[]) =>
       setNodes((nodesSnapshot) => applyNodeChanges(changes, nodesSnapshot)),
     [],
   );
   const onEdgesChange = useCallback(
-    (changes) =>
+    (changes: EdgeChange[]) =>
       setEdges((edgesSnapshot) => applyEdgeChanges(changes, edgesSnapshot)),
     [],
   );
 
   const onConnect = useCallback(
-    (params) => setEdges((edgesSnapshot) => addEdge(params, edgesSnapshot)),
+    (params: Connection) =>
+      setEdges((edgesSnapshot) => addEdge(params, edgesSnapshot)),
     [],
   );
 
@@ -57,7 +73,9 @@ const Flow = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        className="text-black">
+        fitView
+        className="text-black"
+        nodeTypes={nodeTypes}>
         <Background />
         <Controls className="text-black" />
       </ReactFlow>
