@@ -12,7 +12,7 @@ import { ModeToggle } from "./ModeToggle";
 
 const MainNav = () => {
   return (
-    <Menubar className="m-4">
+    <Menubar className="mx-4 my-2">
       {/* //////////////////////////////////// */}
       <div className="ml-auto"></div>
       <MenubarMenu>
