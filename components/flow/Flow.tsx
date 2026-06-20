@@ -5,6 +5,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  Panel,
   applyEdgeChanges,
   applyNodeChanges,
   addEdge,
@@ -13,11 +14,15 @@ import {
   NodeChange,
   EdgeChange,
   Connection,
-  BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
 import TextUpdaterNode from "../CustomNodes/TextUpdaterNode";
+
+import { ErasableNode } from "./ErasableNode";
+import { ErasableEdge } from "./ErasableEdge";
+import { Eraser } from "./Eraser";
+import { Button } from "@/components/ui/button";
 
 const initialNodes: Node[] = [
   {
@@ -39,15 +44,32 @@ const initialNodes: Node[] = [
   },
 ];
 
-const nodeTypes = { textUpdater: TextUpdaterNode };
+// Both your existing custom node and the new erasable one,
+// registered side by side — nothing about TextUpdaterNode changes.
+const nodeTypes = {
+  textUpdater: TextUpdaterNode,
+  "erasable-node": ErasableNode,
+};
+
+const edgeTypes = {
+  "erasable-edge": ErasableEdge,
+};
 
 const initialEdges: Edge[] = [];
 
 //! //////////////////////////////////////////////////////////////
 
-const Flow = () => {
+const Flow = ({
+  liftWidth,
+}: {
+  liftWidth: { asPercentage: number; inPixels: number };
+}) => {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
+  const [isEraserActive, setIsEraserActive] = useState(false);
+
+  const { inPixels } = liftWidth;
+  // console.log(inPixels);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) =>
@@ -59,12 +81,6 @@ const Flow = () => {
       setEdges((edgesSnapshot) => applyEdgeChanges(changes, edgesSnapshot)),
     [],
   );
-
-  // const onConnect = useCallback(
-  //   (params: Connection) =>
-  //     setEdges((edgesSnapshot) => addEdge(params, edgesSnapshot)),
-  //   [],
-  // );
 
   const onConnect = useCallback(
     (params: Connection) =>
@@ -83,7 +99,7 @@ const Flow = () => {
   );
 
   return (
-    <div className="w-full h-full ">
+    <div className="w-full h-full relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -92,9 +108,21 @@ const Flow = () => {
         onConnect={onConnect}
         fitView
         className="text-black"
-        nodeTypes={nodeTypes}>
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}>
         <Background gap={60} />
         <Controls className="text-black" />
+
+        {isEraserActive && <Eraser inPixels={inPixels} />}
+
+        <Panel position="top-left">
+          <Button
+            size="sm"
+            variant={isEraserActive ? "default" : "outline"}
+            onClick={() => setIsEraserActive((v) => !v)}>
+            {isEraserActive ? "Eraser: On" : "Eraser: Off"}
+          </Button>
+        </Panel>
       </ReactFlow>
     </div>
   );
