@@ -115,9 +115,10 @@ const Flow = ({
 
         {isEraserActive && <Eraser inPixels={inPixels} />}
 
-        <Panel position="top-left">
+        <Panel position="bottom-right">
           <Button
-            size="sm"
+            size="lg"
+            className="text-white z-30"
             variant={isEraserActive ? "default" : "outline"}
             onClick={() => setIsEraserActive((v) => !v)}>
             {isEraserActive ? "Eraser: On" : "Eraser: Off"}

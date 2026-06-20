@@ -79,7 +79,7 @@ export function Eraser({ inPixels }: { inPixels: number }) {
 
     isDrawing.current = true;
     trailPoints.current = [
-      { point: [e.pageX, e.pageY], timestamp: Date.now() },
+      { point: [e.pageX - inPixels, e.pageY], timestamp: Date.now() },
     ];
 
     nodeIntersectionData.current = [];
@@ -134,7 +134,7 @@ export function Eraser({ inPixels }: { inPixels: number }) {
     if (e.buttons !== 1) return;
 
     trailPoints.current.push({
-      point: [e.pageX - inPixels * 1.1, e.pageY],
+      point: [e.pageX - inPixels * 1.1, e.pageY - 60],
       timestamp: Date.now(),
     });
     const points = trailPoints.current.map((tp) => tp.point);
@@ -143,7 +143,7 @@ export function Eraser({ inPixels }: { inPixels: number }) {
 
     const flowPoints = points.map(([x, y]) => {
       const flowPos = screenToFlowPosition({ x, y });
-      return [flowPos.x + inPixels, flowPos.y] as [number, number];
+      return [flowPos.x + inPixels, flowPos.y + 60] as [number, number];
     });
 
     const nodesToDelete = new Set<string>();
