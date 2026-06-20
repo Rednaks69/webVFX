@@ -13,6 +13,7 @@ import {
   NodeChange,
   EdgeChange,
   Connection,
+  BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -59,14 +60,30 @@ const Flow = () => {
     [],
   );
 
+  // const onConnect = useCallback(
+  //   (params: Connection) =>
+  //     setEdges((edgesSnapshot) => addEdge(params, edgesSnapshot)),
+  //   [],
+  // );
+
   const onConnect = useCallback(
     (params: Connection) =>
-      setEdges((edgesSnapshot) => addEdge(params, edgesSnapshot)),
+      setEdges((edgesSnapshot) =>
+        addEdge(
+          {
+            ...params,
+            animated:
+              (params.source === "n2" && params.target === "n3") ||
+              (params.source === "n3" && params.target === "n2"),
+          },
+          edgesSnapshot,
+        ),
+      ),
     [],
   );
 
   return (
-    <div className="w-[calc(100vw-5px)] h-[calc(100vh-80px)] ">
+    <div className="w-full h-full ">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -76,7 +93,7 @@ const Flow = () => {
         fitView
         className="text-black"
         nodeTypes={nodeTypes}>
-        <Background />
+        <Background gap={60} />
         <Controls className="text-black" />
       </ReactFlow>
     </div>

@@ -47,7 +47,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange>
           <MainNav />
-          {children}
+          <main className="flex-1 overflow-hidden">{children}</main>
         </ThemeProvider>
       </body>
     </html>
