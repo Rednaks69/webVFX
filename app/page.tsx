@@ -21,9 +21,9 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import MainRenderer from "@/components/renders/MainRenderer";
 
 const Home = () => {
-  const [liftWidth, setLiftWidth] = useState(0);
   const leftPanelRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -31,27 +31,22 @@ const Home = () => {
       <ResizablePanelGroup
         orientation="horizontal"
         className="flex-1 w-full h-full rounded-lg border">
-        <ResizablePanel
-          defaultSize="15%"
-          onResize={(size) => {
-            console.log(size);
-            setLiftWidth(size);
-          }}>
+        <ResizablePanel defaultSize="30%">
           <div
             ref={leftPanelRef}
             className="flex h-full items-center justify-center p-6">
-            <span className="font-semibold">One</span>
+            <MainRenderer />
           </div>
         </ResizablePanel>
-        <ResizableHandle withHandle />
         {/* / / / / /  two */}
+        <ResizableHandle withHandle />
         <ResizablePanel defaultSize="50%">
           <ResizablePanelGroup orientation="vertical" className="h-full">
             <ResizablePanel>
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div className="h-full p-2">
-                    <Flow liftWidth={liftWidth} />
+                    <Flow />
                   </div>
                 </ContextMenuTrigger>
 
@@ -85,7 +80,7 @@ const Home = () => {
                 {/*  */}
               </ContextMenu>
             </ResizablePanel>
-            {/* / / / / /  two */}
+            {/* / / / / /  two end*/}
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize="10%">
               <div className="flex h-full items-center justify-center p-6">

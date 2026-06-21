@@ -44,7 +44,7 @@ const storeSelector = (state: ReactFlowState) => ({
   height: state.height,
 });
 
-export function Eraser({ inPixels }: { inPixels: number }) {
+export function Eraser() {
   const { width, height } = useStore(storeSelector);
   const {
     screenToFlowPosition,
@@ -58,6 +58,8 @@ export function Eraser({ inPixels }: { inPixels: number }) {
 
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const ctx = useRef<CanvasRenderingContext2D | undefined | null>(null);
+
+  const canvasRect = useRef<DOMRect | null>(null);
 
   const nodeIntersectionData = useRef<IntersectionData[]>([]);
   const edgeIntersectionData = useRef<IntersectionData[]>([]);
@@ -76,10 +78,11 @@ export function Eraser({ inPixels }: { inPixels: number }) {
 
   function handlePointerDown(e: PointerEvent<HTMLCanvasElement>) {
     (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    canvasRect.current = canvas.current?.getBoundingClientRect() ?? null;
 
     isDrawing.current = true;
     trailPoints.current = [
-      { point: [e.pageX - inPixels, e.pageY], timestamp: Date.now() },
+      { point: [e.clientX, e.clientY], timestamp: Date.now() },
     ];
 
     nodeIntersectionData.current = [];
@@ -134,7 +137,7 @@ export function Eraser({ inPixels }: { inPixels: number }) {
     if (e.buttons !== 1) return;
 
     trailPoints.current.push({
-      point: [e.pageX - inPixels * 1.1, e.pageY - 60],
+      point: [e.clientX, e.clientY],
       timestamp: Date.now(),
     });
     const points = trailPoints.current.map((tp) => tp.point);
@@ -143,7 +146,7 @@ export function Eraser({ inPixels }: { inPixels: number }) {
 
     const flowPoints = points.map(([x, y]) => {
       const flowPos = screenToFlowPosition({ x, y });
-      return [flowPos.x + inPixels, flowPos.y + 60] as [number, number];
+      return [flowPos.x, flowPos.y] as [number, number];
     });
 
     const nodesToDelete = new Set<string>();
@@ -209,13 +212,17 @@ export function Eraser({ inPixels }: { inPixels: number }) {
   }
 
   function drawTrail() {
-    if (!ctx.current || !canvas.current) return;
+    if (!ctx.current || !canvas.current || !canvasRect.current) return;
 
     ctx.current.clearRect(0, 0, canvas.current.width, canvas.current.height);
     if (trailPoints.current.length < 2) return;
 
     const strokePoints: [number, number, number][] = trailPoints.current.map(
-      ({ point }) => [point[0], point[1], 0.5],
+      ({ point }) => [
+        point[0] - canvasRect.current!.left,
+        point[1] - canvasRect.current!.top,
+        0.5,
+      ],
     );
 
     const stroke = getStroke(strokePoints, pathOptions);

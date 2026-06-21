@@ -23,6 +23,7 @@ import { ErasableNode } from "./ErasableNode";
 import { ErasableEdge } from "./ErasableEdge";
 import { Eraser } from "./Eraser";
 import { Button } from "@/components/ui/button";
+import { BiSolidEraser } from "react-icons/bi";
 
 const initialNodes: Node[] = [
   {
@@ -59,16 +60,11 @@ const initialEdges: Edge[] = [];
 
 //! //////////////////////////////////////////////////////////////
 
-const Flow = ({
-  liftWidth,
-}: {
-  liftWidth: { asPercentage: number; inPixels: number };
-}) => {
+const Flow = () => {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
   const [isEraserActive, setIsEraserActive] = useState(false);
 
-  const { inPixels } = liftWidth;
   // console.log(inPixels);
 
   const onNodesChange = useCallback(
@@ -113,15 +109,34 @@ const Flow = ({
         <Background gap={60} />
         <Controls className="text-black" />
 
-        {isEraserActive && <Eraser inPixels={inPixels} />}
+        {isEraserActive && <Eraser />}
 
-        <Panel position="bottom-right">
+        <Panel position="bottom-center">
           <Button
-            size="lg"
-            className="text-white z-30"
+            size="default"
+            className="text-white z-30 p-6"
             variant={isEraserActive ? "default" : "outline"}
             onClick={() => setIsEraserActive((v) => !v)}>
-            {isEraserActive ? "Eraser: On" : "Eraser: Off"}
+            {isEraserActive ? (
+              <div className="flex flex-col items-center justify-center">
+                <BiSolidEraser className="text-black" />
+                <p className="text-[8pt] text-gray-600 dark:text-white">
+                  Eraser{" "}
+                  <span className="text-black text-[8pt] font-bold"> ON </span>
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center">
+                <BiSolidEraser className="text-yellow-500" />
+                <p className="text-[8pt] text-gray-600 dark:text-gray-50">
+                  Eraser{" "}
+                  <span className="text-yellow-500 text-[8pt] font-bold">
+                    {" "}
+                    OFF{" "}
+                  </span>
+                </p>
+              </div>
+            )}
           </Button>
         </Panel>
       </ReactFlow>

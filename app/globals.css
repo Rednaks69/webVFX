@@ -158,6 +158,6 @@
   height: 100%;
   width: 100%;
   transform-origin: top left;
-  cursor: crosshair;
+  cursor: url("../public/cursor/icons8-delete-cursor-24.png"), auto;
   touch-action: none;
 }
