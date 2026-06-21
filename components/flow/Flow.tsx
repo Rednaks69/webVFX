@@ -18,6 +18,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import TextUpdaterNode from "../CustomNodes/TextUpdaterNode";
+import UVNode from "../CustomNodes/UVNode";
 
 import { ErasableNode } from "./ErasableNode";
 import { ErasableEdge } from "./ErasableEdge";
@@ -43,6 +44,12 @@ const initialNodes: Node[] = [
     position: { x: 700, y: 700 },
     data: { value: "Node 2" },
   },
+  {
+    id: "n4",
+    type: "uvNode",
+    position: { x: 200, y: 700 },
+    data: { value: "Node 2" },
+  },
 ];
 
 // Both your existing custom node and the new erasable one,
@@ -50,6 +57,7 @@ const initialNodes: Node[] = [
 const nodeTypes = {
   textUpdater: TextUpdaterNode,
   "erasable-node": ErasableNode,
+  uvNode: UVNode,
 };
 
 const edgeTypes = {

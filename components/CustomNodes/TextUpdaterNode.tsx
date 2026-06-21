@@ -10,8 +10,8 @@ function TextUpdaterNode() {
     <div
       className="rounded-md bg-gray-200 px-1  
     dark:bg-[#3b3b3b57] ">
-      <Handle type="source" position={Position.Right} id="target-text-1" />
-      <Handle type="target" position={Position.Left} id="source-text-1" />
+      <Handle type="target" position={Position.Right} id="target-text-1" />
+      <Handle type="source" position={Position.Left} id="source-text-1" />
 
       <div>
         <label

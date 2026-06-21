@@ -1,7 +1,7 @@
 "use client";
 
 import Flow from "@/components/flow/Flow";
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 
 import {
   ResizableHandle,
@@ -15,7 +15,6 @@ import {
   ContextMenuGroup,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuShortcut,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -31,7 +30,7 @@ const Home = () => {
       <ResizablePanelGroup
         orientation="horizontal"
         className="flex-1 w-full h-full rounded-lg border">
-        <ResizablePanel defaultSize="30%">
+        <ResizablePanel defaultSize="20%">
           <div
             ref={leftPanelRef}
             className="flex h-full items-center justify-center p-6">
