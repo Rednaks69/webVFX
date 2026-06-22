@@ -3,8 +3,9 @@
 
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import type { ParamsMap } from "@/components/flow/uv-params-store";
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -15,35 +16,44 @@ const vertexShader = /* glsl */ `
   }
 `;
 
-const fragmentShader = /* glsl */ `
-  varying vec2 vUv;
+type ShaderPlaneNodeProps = {
+  fragmentShader: string;
+  params: ParamsMap;
+};
 
+function ShaderPlaneNode({ fragmentShader, params }: ShaderPlaneNodeProps) {
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
 
-  void main() {
+  // Uniforms object only needs to be (re)built when the shader itself
+  // changes (i.e. switching node kind) - the `key` below forces a remount
+  // in that case. Per-frame param edits just mutate existing uniforms.
+  const uniforms = useMemo(() => {
+    const u: Record<string, { value: number }> = {};
+    for (const [key, value] of Object.entries(params)) {
+      u[key] = { value };
+    }
+    return u;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fragmentShader]);
 
-  vec2 uv = vUv;
-  uv.y = 1.0 - uv.y;
+  useEffect(() => {
+    if (!materialRef.current) return;
+    for (const [key, value] of Object.entries(params)) {
+      if (materialRef.current.uniforms[key]) {
+        materialRef.current.uniforms[key].value = value;
+      }
+    }
+  }, [params]);
 
-  float r = smoothstep(0.45, 0.55, uv.x);
-  float g = smoothstep(0.45, 0.55, uv.y);
-
-  vec3 color = vec3(r, g, 0.0);
-
-    gl_FragColor = vec4(color, 1.0);
-  }
-`;
-
-function ShaderPlaneNode() {
-  const tilingArray = [5.0, 1.0];
   return (
     <mesh>
       <planeGeometry args={[20, 20]} />
       <shaderMaterial
+        key={fragmentShader}
+        ref={materialRef}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
-        uniforms={{
-          uTiling: { value: tilingArray },
-        }}
+        uniforms={uniforms}
       />
     </mesh>
   );
@@ -51,7 +61,6 @@ function ShaderPlaneNode() {
 
 function FixedCamera() {
   const { camera, size } = useThree();
-  //   console.log(size);
 
   useEffect(() => {
     const cam = camera as THREE.OrthographicCamera;
@@ -59,8 +68,6 @@ function FixedCamera() {
     const zoom = 8;
     const halfW = size.width / 2 / zoom;
     const halfH = size.height / 2 / zoom;
-
-    // console.log(halfW);
 
     // eslint-disable-next-line react-hooks/immutability
     cam.left = -halfW;
@@ -77,12 +84,20 @@ function FixedCamera() {
   return null;
 }
 
-export default function ShaderNode() {
+type ShaderCanvasProps = {
+  fragmentShader: string;
+  params: ParamsMap;
+};
+
+export default function ShaderCanvas({
+  fragmentShader,
+  params,
+}: ShaderCanvasProps) {
   return (
     <div className="w-50 h-50 ml-5 mt-10 mb-0 -z-50">
       <Canvas orthographic camera={{ position: [0, 0, 1] }}>
         <FixedCamera />
-        <ShaderPlaneNode />
+        <ShaderPlaneNode fragmentShader={fragmentShader} params={params} />
         <OrbitControls enableRotate={false} />
       </Canvas>
     </div>

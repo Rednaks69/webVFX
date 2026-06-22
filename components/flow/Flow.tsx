@@ -48,7 +48,13 @@ const initialNodes: Node[] = [
     id: "n4",
     type: "uvNode",
     position: { x: 200, y: 700 },
-    data: { value: "Node 2" },
+    data: { kind: "uv-identity" },
+  },
+  {
+    id: "n5",
+    type: "uvNode",
+    position: { x: 200, y: 900 },
+    data: { kind: "uv-transform" },
   },
 ];
 
