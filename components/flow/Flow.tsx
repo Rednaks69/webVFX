@@ -31,7 +31,7 @@ const initialNodes: Node[] = [
     id: "n1",
     position: { x: 400, y: 400 },
     data: { label: "Node 1" },
-    type: "input",
+    type: "output",
   },
   {
     id: "n2",
