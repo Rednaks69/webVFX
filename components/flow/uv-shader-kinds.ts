@@ -61,8 +61,22 @@ export const UV_IDENTITY: UVNodeKind = {
   label: "UV Identity",
   fragmentShader: identityFragmentShader,
   params: [
-    { key: "uEdge0", label: "Edge 0 (r start)", defaultValue: 0.45, min: 0, max: 1, step: 0.01 },
-    { key: "uEdge1", label: "Edge 1 (r end)", defaultValue: 0.55, min: 0, max: 1, step: 0.01 },
+    {
+      key: "uEdge0",
+      label: "Edge 0 (r start)",
+      defaultValue: 0.45,
+      min: 0,
+      max: 1,
+      step: 0.001,
+    },
+    {
+      key: "uEdge1",
+      label: "Edge 1 (r end)",
+      defaultValue: 0.55,
+      min: 0,
+      max: 1,
+      step: 0.001,
+    },
   ],
 };
 
@@ -71,10 +85,36 @@ export const UV_TRANSFORM: UVNodeKind = {
   label: "UV Transform",
   fragmentShader: transformFragmentShader,
   params: [
-    { key: "uRotation", label: "Rotation", defaultValue: 0, min: -Math.PI, max: Math.PI, step: 0.01 },
-    { key: "uScale", label: "Scale", defaultValue: 1, min: 0.1, max: 4, step: 0.01 },
+    {
+      key: "uRotation",
+      label: "Rotation",
+      defaultValue: 0,
+      min: -Math.PI,
+      max: Math.PI,
+      step: 0.01,
+    },
+    {
+      key: "uScale",
+      label: "Scale",
+      defaultValue: 1,
+      min: 0.1,
+      max: 4,
+      step: 0.01,
+    },
   ],
 };
+
+/**
+ * This turns your list of kinds into a lookup table keyed by id,
+ * instead of an array you'd have to .find() through. Whenever you have
+ * "a small fixed set of named things I'll look up by name often,"
+ * reach for an object/Record instead of an array — O(1) lookup by key
+ * versus scanning. The [UV_IDENTITY.id]: UV_IDENTITY syntax is a computed
+ * property name — it means "use the value of UV_IDENTITY.id
+ * (the string "uv-identity") as the key," not the literal text UV_IDENTITY.id.
+ * This way the key and the id field can never drift apart, since one is derived
+ * from the other.
+ * */
 
 export const UV_NODE_KINDS: Record<string, UVNodeKind> = {
   [UV_IDENTITY.id]: UV_IDENTITY,
