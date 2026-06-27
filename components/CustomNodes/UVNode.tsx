@@ -17,9 +17,20 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
   const kindId = data.kind ?? DEFAULT_UV_KIND_ID;
   const kind = getUVNodeKind(kindId);
   const defaults = useMemo(() => getDefaultParams(kind), [kind]);
-  const [isActive, setIsActive] = useState(false);
-  const { getParams, selectNode } = useUVParamsStore();
+  const {
+    getParams,
+    selectNode,
+    outputNodeId,
+    setOutputNode,
+    clearOutputNode,
+  } = useUVParamsStore();
+
   const params = getParams(id, defaults);
+
+  // Active means "this node is currently the one feeding the shared
+  // ShaderCanvas preview" — derived from the store instead of local state,
+  // so the button reflects reality even if some other node steals output.
+  const isActive = outputNodeId === id;
 
   const bgClass = isActive
     ? "bg-purple-600 dark:bg-purple-800 text-white" // Color after clicking
@@ -69,7 +80,9 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
         <div className="flex justify-between mt-[1.2rem] px-3 dark:text-gray-200">
           <p>In UV</p>
           <Button
-            onClick={() => setIsActive(!isActive)}
+            onClick={() =>
+              isActive ? clearOutputNode() : setOutputNode(id, kindId)
+            }
             className={`${bgClass} -mt-2 rounded-md transition-colors duration-200`}>
             Out UV
           </Button>

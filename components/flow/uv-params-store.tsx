@@ -28,6 +28,10 @@ type StoreState = {
   clearSelection: () => void;
   getParams: (id: string, defaults: ParamsMap) => ParamsMap;
   setParams: (id: string, params: ParamsMap) => void;
+  outputNodeId: string | null;
+  outputKindId: string | null;
+  setOutputNode: (id: string, kindId: string) => void;
+  clearOutputNode: () => void;
 };
 
 /**
@@ -45,7 +49,8 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedKindId, setSelectedKindId] = useState<string | null>(null);
   const [paramsById, setParamsById] = useState<Record<string, ParamsMap>>({});
-
+  const [outputNodeId, setOutputNodeId] = useState<string | null>(null);
+  const [outputKindId, setOutputKindId] = useState<string | null>(null);
   /**
    * 
   three independent pieces of state:
@@ -95,6 +100,20 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  // "Out UV" is a toggle, not a plain setter: clicking the active node's
+  // own output button should turn the preview off again, so we bundle
+  // "set both id+kind together" the same way selectNode does, rather than
+  // letting a consumer set one without the other and drift out of sync.
+  const setOutputNode = useCallback((id: string, kindId: string) => {
+    setOutputNodeId(id);
+    setOutputKindId(kindId);
+  }, []);
+
+  const clearOutputNode = useCallback(() => {
+    setOutputNodeId(null);
+    setOutputKindId(null);
+  }, []);
+
   /**
    * 
   -> Spread prev (keep every other node's params untouched).
@@ -114,6 +133,10 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
         clearSelection,
         getParams,
         setParams,
+        outputNodeId,
+        outputKindId,
+        setOutputNode,
+        clearOutputNode,
       }}>
       {children}
     </UVParamsContext.Provider>

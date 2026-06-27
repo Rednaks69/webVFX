@@ -1,7 +1,7 @@
 // app/shaders/ShaderPlane.tsx
 "use client";
 
-import { Canvas, useThree, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import {
   OrbitControls,
   OrthographicCamera,
@@ -12,6 +12,15 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useRenderMode } from "@/components/renders/render-mode-store";
+
+import {
+  useUVParamsStore,
+  type ParamsMap,
+} from "@/components/flow/uv-params-store";
+import {
+  getUVNodeKind,
+  getDefaultParams,
+} from "@/components/flow/uv-shader-kinds";
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -28,14 +37,47 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
-function ShaderPlane() {
+// Renders whichever UV node is currently flagged as "output" (via the
+// "Out UV" button). `fragmentShader` decides whether to rebuild uniforms
+// (key={fragmentShader} forces a remount only when the shader itself
+// changes — e.g. switching node kind — not on every slider tick).
+function ShaderPlane({
+  fragmentShader,
+  params,
+}: {
+  fragmentShader: string;
+  params: ParamsMap;
+}) {
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+
+  const uniforms = useMemo(() => {
+    const u: Record<string, { value: number }> = {};
+    for (const [key, value] of Object.entries(params)) {
+      u[key] = { value };
+    }
+    return u;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fragmentShader]);
+
+  useEffect(() => {
+    if (!materialRef.current) return;
+    for (const [key, value] of Object.entries(params)) {
+      if (materialRef.current.uniforms[key]) {
+        materialRef.current.uniforms[key].value = value;
+      }
+    }
+  }, [params]);
+
   return (
     <mesh>
       <planeGeometry args={[10, 10]} />
       <shaderMaterial
+        key={fragmentShader}
+        ref={materialRef}
         side={THREE.DoubleSide}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
+        uniforms={uniforms}
       />
     </mesh>
   );
@@ -118,12 +160,25 @@ function AngledPerspectiveCamera({
 export default function ShaderCanvas() {
   const { mode } = useRenderMode();
 
+  const { outputNodeId, outputKindId, getParams } = useUVParamsStore();
+
+  // Fall back to the plain UV-passthrough shader (no uniforms) when no
+  // node has claimed output, so the canvas isn't blank by default.
+  const activeKind = outputKindId ? getUVNodeKind(outputKindId) : null;
+  const activeFragmentShader = activeKind
+    ? activeKind.fragmentShader
+    : fragmentShader;
+  const activeParams = activeKind
+    ? getParams(outputNodeId!, getDefaultParams(activeKind))
+    : {};
+
   const isOrtho = mode === "2d" || mode === "2d-to-3d";
   const isPerspective = mode === "3d" || mode === "auto";
 
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const restingPosition = useRef(new THREE.Vector3(10, -10, 8));
+  // eslint-disable-next-line react-hooks/refs
   const restingPositionCurrent = useMemo(() => restingPosition.current, []);
   // Fires when the user releases the mouse/finger after dragging OrbitControls.
   // Only snap back in "3d" mode — this is the actual "rotates freely while
@@ -148,7 +203,10 @@ export default function ShaderCanvas() {
           cameraRef={cameraRef}
           restingPosition={restingPositionCurrent}
         />
-        <ShaderPlane />
+        <ShaderPlane
+          fragmentShader={activeFragmentShader}
+          params={activeParams}
+        />
         {isPerspective && (
           <Grid
             args={[20, 20]}
