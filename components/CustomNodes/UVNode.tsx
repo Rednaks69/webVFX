@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Position, Handle, type NodeProps, type Node } from "@xyflow/react";
 import ShaderNode from "@/app/shaders/ShaderNode";
 import { useUVParamsStore } from "@/components/flow/uv-params-store";
@@ -7,6 +7,8 @@ import {
   getDefaultParams,
   DEFAULT_UV_KIND_ID,
 } from "@/components/flow/uv-shader-kinds";
+import { Button } from "../ui/button";
+// import { Toggle } from "@/components/ui/toggle";
 
 export type UVNodeData = { label?: string; kind?: string };
 export type UVNodeType = Node<UVNodeData, "uvNode">;
@@ -15,9 +17,13 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
   const kindId = data.kind ?? DEFAULT_UV_KIND_ID;
   const kind = getUVNodeKind(kindId);
   const defaults = useMemo(() => getDefaultParams(kind), [kind]);
-
+  const [isActive, setIsActive] = useState(false);
   const { getParams, selectNode } = useUVParamsStore();
   const params = getParams(id, defaults);
+
+  const bgClass = isActive
+    ? "bg-purple-600 dark:bg-purple-800 text-white" // Color after clicking
+    : "bg-[#ffffff60] dark:bg-[#d3d3d320] dark:text-gray-200 text-black "; // Your original background color
 
   return (
     <div
@@ -31,8 +37,7 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
         aria-label="output"
         style={{
           top: "25%",
-          background: "none",
-          border: "1pt solid #fff",
+          background: "#c800de",
           width: ".7em",
           height: ".7em",
           zIndex: 10,
@@ -43,8 +48,8 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
         position={Position.Left}
         id="target-UV-1"
         style={{
-          background: "none",
-          border: "1pt solid #fff",
+          top: "25%",
+          background: "#4a556570",
           width: ".7em",
           height: ".7em",
           zIndex: 10,
@@ -52,13 +57,24 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
       />
 
       <div>
+        <div
+          className="w-[80%] h-px bg-[#d3d3d357] dark:bg-[#5f5f5f57] 
+        mb-1 justify-center items-center self-center flex-1 translate-x-5"></div>
         <label
           htmlFor="text"
-          className="px-4 text-[8pt] text-gray-600 dark:text-white">
+          className="px-4 text-[12pt] text-gray-600 dark:text-white">
           {kind.label}
         </label>
         <div className="w-full h-0.5 bg-[#d3d3d357] dark:bg-[#5f5f5f57] mt-1"></div>
-        <div className="w-40 h-40">
+        <div className="flex justify-between mt-[1.2rem] px-3 dark:text-gray-200">
+          <p>In UV</p>
+          <Button
+            onClick={() => setIsActive(!isActive)}
+            className={`${bgClass} -mt-2 rounded-md transition-colors duration-200`}>
+            Out UV
+          </Button>
+        </div>
+        <div className="w-40 h-40 sm:ml-3 md:ml-5 lg:ml-6 mt-4 mb-0">
           <ShaderNode fragmentShader={kind.fragmentShader} params={params} />
         </div>
       </div>

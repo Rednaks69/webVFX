@@ -8,7 +8,7 @@ import {
   PerspectiveCamera,
   Grid,
 } from "@react-three/drei";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useRenderMode } from "@/components/renders/render-mode-store";
@@ -123,8 +123,8 @@ export default function ShaderCanvas() {
 
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   const controlsRef = useRef<OrbitControlsImpl>(null);
-  const restingPosition = useRef(new THREE.Vector3(10, -10, 8)).current;
-
+  const restingPosition = useRef(new THREE.Vector3(10, -10, 8));
+  const restingPositionCurrent = useMemo(() => restingPosition.current, []);
   // Fires when the user releases the mouse/finger after dragging OrbitControls.
   // Only snap back in "3d" mode — this is the actual "rotates freely while
   // dragging, then springs back on release" behavior you wanted, instead of
@@ -132,7 +132,7 @@ export default function ShaderCanvas() {
   const handleControlsEnd = () => {
     if (mode !== "3d" || !cameraRef.current || !controlsRef.current) return;
 
-    cameraRef.current.position.copy(restingPosition);
+    cameraRef.current.position.copy(restingPositionCurrent);
     cameraRef.current.lookAt(0, 0, 0);
     controlsRef.current.target.set(0, 0, 0);
     controlsRef.current.update();
@@ -146,7 +146,7 @@ export default function ShaderCanvas() {
           active={isPerspective}
           animateIn={mode === "auto"}
           cameraRef={cameraRef}
-          restingPosition={restingPosition}
+          restingPosition={restingPositionCurrent}
         />
         <ShaderPlane />
         {isPerspective && (
