@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -26,6 +26,11 @@ import { Eraser } from "./Eraser";
 import { Button } from "@/components/ui/button";
 import { BiSolidEraser } from "react-icons/bi";
 
+// NEW: pull the graph state from the shared store instead of useState.
+import { useUVParamsStore } from "./uv-params-store";
+
+// UNCHANGED: this is still the seed data. It just moves from being a
+// useState initializer to something we push into the store once, on mount.
 const initialNodes: Node[] = [
   {
     id: "n1",
@@ -58,8 +63,6 @@ const initialNodes: Node[] = [
   },
 ];
 
-// Both your existing custom node and the new erasable one,
-// registered side by side — nothing about TextUpdaterNode changes.
 const nodeTypes = {
   textUpdater: TextUpdaterNode,
   "erasable-node": ErasableNode,
@@ -75,21 +78,44 @@ const initialEdges: Edge[] = [];
 //! //////////////////////////////////////////////////////////////
 
 const Flow = () => {
-  const [nodes, setNodes] = useState(initialNodes);
-  const [edges, setEdges] = useState(initialEdges);
+  // CHANGED: nodes/edges no longer come from local useState — they come
+  // from the shared store, so ShaderCanvas can read the exact same graph
+  // when it composes the preview shader.
+  const { nodes, edges, setNodes, setEdges } = useUVParamsStore();
+
   const [isEraserActive, setIsEraserActive] = useState(false);
 
-  // console.log(inPixels);
+  // NEW: seed the store with the initial graph exactly once, on mount.
+  // Why an effect and not just useState's initial value? Because the
+  // store's useState already ran with an empty array as its initializer
+  // (it has no knowledge of Flow's initialNodes/initialEdges — Flow is the
+  // one place that owns "what does a fresh canvas start with"). This
+  // effect runs once after mount and pushes the seed data in.
+  //
+  // The empty dependency array is intentional: this should fire exactly
+  // once, the same way a useState initializer would have fired exactly
+  // once before. If you ever need Flow to remount with fresh seed data,
+  // that's a sign this should become a prop/key instead of an effect.
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // UNCHANGED below this point — these callbacks already worked purely in
+  // terms of "take the previous snapshot, apply changes, set the result."
+  // They don't care whether that snapshot's setter came from useState or
+  // from a context — the API shape (setNodes(updaterFn)) is identical.
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) =>
       setNodes((nodesSnapshot) => applyNodeChanges(changes, nodesSnapshot)),
-    [],
+    [setNodes],
   );
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) =>
       setEdges((edgesSnapshot) => applyEdgeChanges(changes, edgesSnapshot)),
-    [],
+    [setEdges],
   );
 
   const onConnect = useCallback(
@@ -105,7 +131,7 @@ const Flow = () => {
           edgesSnapshot,
         ),
       ),
-    [],
+    [setEdges],
   );
 
   return (
@@ -159,3 +185,5 @@ const Flow = () => {
 };
 
 export default Flow;
+
+//! //////////////////////////////////////////////////////////////

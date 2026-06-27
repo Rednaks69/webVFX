@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
 import { Position, Handle, type NodeProps, type Node } from "@xyflow/react";
 import ShaderNode from "@/app/shaders/ShaderNode";
-import { useUVParamsStore } from "@/components/flow/uv-params-store";
+import {
+  useUVParamsStore,
+  type ParamsMap,
+} from "@/components/flow/uv-params-store";
 import {
   getUVNodeKind,
   getDefaultParams,
   DEFAULT_UV_KIND_ID,
 } from "@/components/flow/uv-shader-kinds";
+// NEW: builds this node's standalone preview shader.
+import { composeStandaloneShader } from "@/components/flow/compose-shader";
 import { Button } from "../ui/button";
-// import { Toggle } from "@/components/ui/toggle";
 
 export type UVNodeData = { label?: string; kind?: string };
 export type UVNodeType = Node<UVNodeData, "uvNode">;
@@ -25,16 +29,33 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
     clearOutputNode,
   } = useUVParamsStore();
 
+  // These are the RAW param values, keyed by logical key (e.g. "uRotation"),
+  // exactly as before — this part didn't change.
   const params = getParams(id, defaults);
 
-  // Active means "this node is currently the one feeding the shared
-  // ShaderCanvas preview" — derived from the store instead of local state,
-  // so the button reflects reality even if some other node steals output.
+  // NEW: build this node's standalone preview shader. useMemo because the
+  // shader TEXT only needs rebuilding when the kind itself changes (e.g.
+  // switching dropdown from Identity to Transform), not on every slider
+  // drag — same reasoning as everywhere else this pattern shows up.
+  const { fragmentShader, uniforms } = useMemo(
+    () => composeStandaloneShader(kind, id),
+    [kind, id],
+  );
+
+  // NEW: composeStandaloneShader's shader expects uniforms named
+  // "uRotation_n5", not "uRotation" — so we re-key the raw params object
+  // to match before handing it to ShaderNode. ShaderNode itself doesn't
+  // change at all; it just iterates whatever keys it's given.
+  const shaderParams: ParamsMap = {};
+  for (const u of uniforms) {
+    shaderParams[u.uniformName] = params[u.key] ?? 0;
+  }
+
   const isActive = outputNodeId === id;
 
   const bgClass = isActive
-    ? "bg-purple-600 dark:bg-purple-800 text-white" // Color after clicking
-    : "bg-[#ffffff60] dark:bg-[#d3d3d320] dark:text-gray-200 text-black "; // Your original background color
+    ? "bg-purple-600 dark:bg-purple-800 text-white"
+    : "bg-[#ffffff60] dark:bg-[#d3d3d320] dark:text-gray-200 text-black ";
 
   return (
     <div
@@ -42,7 +63,7 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
     dark:bg-[#3b3b3b57] "
       onClick={() => selectNode(id, kindId)}>
       <Handle
-        type="target"
+        type="source"
         position={Position.Right}
         id="source-UV-1"
         aria-label="output"
@@ -55,7 +76,7 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
         }}
       />
       <Handle
-        type="source"
+        type="target"
         position={Position.Left}
         id="target-UV-1"
         style={{
@@ -88,7 +109,9 @@ function UVNode({ id, data }: NodeProps<UVNodeType>) {
           </Button>
         </div>
         <div className="w-40 h-40 sm:ml-3 md:ml-5 lg:ml-6 mt-4 mb-0">
-          <ShaderNode fragmentShader={kind.fragmentShader} params={params} />
+          {/* CHANGED: was kind.fragmentShader/params, now the composed
+              standalone shader + re-keyed params */}
+          <ShaderNode fragmentShader={fragmentShader} params={shaderParams} />
         </div>
       </div>
     </div>

@@ -1,14 +1,3 @@
-/****************************************************************************
-1- Define the shape of shared data (here: ParamsMap).
-2- Define the contract — what can readers see, what can writers do (StoreState).
-3- Create the context, typed as Contract | null.
-4- Build the provider: real useState for each independent piece of data, 
-    useCallback-wrapped functions for any state changes, especially ones that 
-    touch more than one piece of state at once or update a nested structure.
-5- Bundle it all into the value prop.
-6- Write a useX() hook that wraps useContext and throws if it's null.
-*****************************************************************************/
-
 "use client";
 
 import {
@@ -18,6 +7,9 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+// NEW: we need React Flow's types now, since this store is about to hold
+// the actual graph (nodes + edges), not just per-node param values.
+import type { Node, Edge } from "@xyflow/react";
 
 export type ParamsMap = Record<string, number>;
 
@@ -32,18 +24,21 @@ type StoreState = {
   outputKindId: string | null;
   setOutputNode: (id: string, kindId: string) => void;
   clearOutputNode: () => void;
+
+  // ---------------------------------------------------------------------
+  // NEW: the graph itself. Flow.tsx is the "writer" (it owns the canvas
+  // interactions — dragging, connecting, deleting). ShaderCanvas is a
+  // "reader" — it needs to see the same nodes/edges to walk the graph in
+  // compose-shader.ts. Putting them here means neither side has to thread
+  // props down through unrelated components.
+  // ---------------------------------------------------------------------
+  nodes: Node[];
+  edges: Edge[];
+  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
 };
 
-/**
- * A reader needs to know what's selected (selectedNodeId, selectedKindId) 
- *  and the current values (getParams).
- * A writer needs a way to change the selection (selectNode, clearSelection) 
-    and a way to change values (setParams).
- */
 const UVParamsContext = createContext<StoreState | null>(null);
-
-// The actual context object. It's StoreState | null because before
-// the Provider mounts, there's nothing to give out
 
 export function UVParamsProvider({ children }: { children: ReactNode }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -51,20 +46,15 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
   const [paramsById, setParamsById] = useState<Record<string, ParamsMap>>({});
   const [outputNodeId, setOutputNodeId] = useState<string | null>(null);
   const [outputKindId, setOutputKindId] = useState<string | null>(null);
-  /**
-   * 
-  three independent pieces of state:
 
-  -> selectedNodeId — "which node is active"
-  -> selectedKindId — "what kind of node it is" 
-      (so the panel knows which param schema to render, 
-      without having to go look up the node itself)
-  -> paramsById — a dictionary keyed by node id, 
-      e.g. { "n4": { uEdge0: 0.6, uEdge1: 0.8 }, "n5": { uRotation: 1.1 } }. 
-      Every node gets its own slot, so editing one node's sliders never 
-      touches another's. 
-  
-    */
+  // NEW: the graph state, moved here from Flow.tsx's local useState.
+  // Starts empty — Flow.tsx will seed it with the same initialNodes/
+  // initialEdges it used before, via a useEffect or by just initializing
+  // useState's initial value through a prop. We'll do the simplest thing:
+  // Flow.tsx keeps owning the *initial* data, but the *state* itself lives
+  // here so ShaderCanvas can read it too.
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
 
   const selectNode = useCallback((id: string, kindId: string) => {
     setSelectedNodeId(id);
@@ -76,22 +66,10 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
     setSelectedKindId(null);
   }, []);
 
-  /**
-   * bundled state updates — instead of every consumer calling two setters and
-   * having to remember to keep them in sync, you give them one verb: "select
-   * this node" or "clear the selection.
-   */
-
   const getParams = useCallback(
     (id: string, defaults: ParamsMap) => ({ ...defaults, ...paramsById[id] }),
     [paramsById],
   );
-
-  /**
-   * If the user hasn't touched a slider yet, paramsById[id] is undefined,
-   *  and spreading undefined is a no-op — so you just get the defaults back.
-   *? That's the trick to avoid initializing every node's params up front.
-   * */
 
   const setParams = useCallback((id: string, params: ParamsMap) => {
     setParamsById((prev) => ({
@@ -100,10 +78,6 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  // "Out UV" is a toggle, not a plain setter: clicking the active node's
-  // own output button should turn the preview off again, so we bundle
-  // "set both id+kind together" the same way selectNode does, rather than
-  // letting a consumer set one without the other and drift out of sync.
   const setOutputNode = useCallback((id: string, kindId: string) => {
     setOutputNodeId(id);
     setOutputKindId(kindId);
@@ -113,16 +87,6 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
     setOutputNodeId(null);
     setOutputKindId(null);
   }, []);
-
-  /**
-   * 
-  -> Spread prev (keep every other node's params untouched).
-  -> Overwrite just the [id] key.
-        For that key, spread the existing params for that node, 
-        then overlay the new ones
-  *? example: 
-  *? so calling setParams("n4", { uEdge0: 0.9 }) doesn't wipe out uEdge1.
-  */
 
   return (
     <UVParamsContext.Provider
@@ -137,6 +101,11 @@ export function UVParamsProvider({ children }: { children: ReactNode }) {
         outputKindId,
         setOutputNode,
         clearOutputNode,
+        // NEW: expose the graph + its setters.
+        nodes,
+        edges,
+        setNodes,
+        setEdges,
       }}>
       {children}
     </UVParamsContext.Provider>

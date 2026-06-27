@@ -21,6 +21,9 @@ import {
   getUVNodeKind,
   getDefaultParams,
 } from "@/components/flow/uv-shader-kinds";
+// NEW: the graph walker. This is what turns "Transform feeds Identity"
+// into one real fragment shader instead of two independent ones.
+import { composeShader } from "@/components/flow/compose-shader";
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -30,17 +33,10 @@ const vertexShader = /* glsl */ `
   }
 `;
 
-const fragmentShader = /* glsl */ `
-  varying vec2 vUv;
-  void main() {
-    gl_FragColor = vec4(vUv, 0.0, 1.0);
-  }
-`;
-
-// Renders whichever UV node is currently flagged as "output" (via the
-// "Out UV" button). `fragmentShader` decides whether to rebuild uniforms
-// (key={fragmentShader} forces a remount only when the shader itself
-// changes — e.g. switching node kind — not on every slider tick).
+// UNCHANGED: ShaderPlane itself doesn't need to know anything changed.
+// It still just receives a fragmentShader string and a flat params map,
+// and mutates uniforms by key — exactly like before. All the new logic is
+// upstream of this component, in how those two props get computed.
 function ShaderPlane({
   fragmentShader,
   params,
@@ -83,6 +79,7 @@ function ShaderPlane({
   );
 }
 
+// UNCHANGED — camera components stay exactly as they were.
 function FlatOrthoCamera({ active }: { active: boolean }) {
   return (
     <OrthographicCamera
@@ -94,10 +91,6 @@ function FlatOrthoCamera({ active }: { active: boolean }) {
   );
 }
 
-// Elevated 3/4 view, looking down at the plane.
-// `cameraRef` is passed in from the parent so OrbitControls' onEnd handler
-// (also in the parent) can snap this camera back without us re-checking
-// distance every single frame, which is what caused both previous bugs.
 function AngledPerspectiveCamera({
   active,
   animateIn,
@@ -109,25 +102,15 @@ function AngledPerspectiveCamera({
   cameraRef: React.RefObject<THREE.PerspectiveCamera | null>;
   restingPosition: THREE.Vector3;
 }) {
-  // Latches to true once the "auto" flythrough finishes. After that,
-  // useFrame below NEVER touches position again — no matter how far
-  // OrbitControls drags the camera. This is what fixes the "auto" snap-back:
-  // before, we re-checked distance every frame and re-engaged the lerp
-  // any time you dragged away from the target.
   const introDoneRef = useRef(false);
 
   useEffect(() => {
     if (!active || !cameraRef.current) return;
 
     if (animateIn) {
-      // "auto" mode: start the flythrough from a flat top-down position
-      // each time this camera (re)activates.
       cameraRef.current.position.set(0, 0, 10);
       introDoneRef.current = false;
     } else {
-      // "3d" mode: snap straight to the resting position on activation,
-      // then OrbitControls owns it. No per-frame enforcement here anymore —
-      // that's now handled by onEnd in the parent (see ShaderCanvas).
       cameraRef.current.position.copy(restingPosition);
       cameraRef.current.lookAt(0, 0, 0);
     }
@@ -135,14 +118,14 @@ function AngledPerspectiveCamera({
 
   useFrame(() => {
     if (!active || !cameraRef.current) return;
-    if (!animateIn) return; // "3d" mode: nothing to do here at all now.
-    if (introDoneRef.current) return; // "auto" mode, but already arrived.
+    if (!animateIn) return;
+    if (introDoneRef.current) return;
 
     cameraRef.current.position.lerp(restingPosition, 0.04);
     cameraRef.current.lookAt(0, 0, 0);
 
     if (cameraRef.current.position.distanceTo(restingPosition) < 0.01) {
-      introDoneRef.current = true; // arrived — latch permanently, never re-check.
+      introDoneRef.current = true;
     }
   });
 
@@ -160,17 +143,70 @@ function AngledPerspectiveCamera({
 export default function ShaderCanvas() {
   const { mode } = useRenderMode();
 
-  const { outputNodeId, outputKindId, getParams } = useUVParamsStore();
+  // CHANGED: we now also pull `nodes` and `edges` out of the store — these
+  // are the same arrays Flow.tsx reads and writes. We need them here
+  // because composeShader() has to walk the actual graph topology to know
+  // which nodes feed which.
+  const { outputNodeId, nodes, edges, getParams } = useUVParamsStore();
 
-  // Fall back to the plain UV-passthrough shader (no uniforms) when no
-  // node has claimed output, so the canvas isn't blank by default.
-  const activeKind = outputKindId ? getUVNodeKind(outputKindId) : null;
-  const activeFragmentShader = activeKind
-    ? activeKind.fragmentShader
-    : fragmentShader;
-  const activeParams = activeKind
-    ? getParams(outputNodeId!, getDefaultParams(activeKind))
-    : {};
+  // ---------------------------------------------------------------------
+  // CHANGED: this whole block replaces the old
+  //   const activeKind = outputKindId ? getUVNodeKind(outputKindId) : null;
+  //   const activeFragmentShader = activeKind ? activeKind.fragmentShader : fragmentShader;
+  //   const activeParams = activeKind ? getParams(outputNodeId!, getDefaultParams(activeKind)) : {};
+  //
+  // Instead of looking at ONLY the output node's kind/params, we ask
+  // composeShader to walk backward from outputNodeId through `edges`,
+  // collecting every upstream "uv-op" node along the way, and return:
+  //   - fragmentShader: one shader with all the chained functions spliced in
+  //   - uniforms: a flat list describing every uniform that shader expects,
+  //     each tagged with which node it belongs to (uniforms[i].nodeId) and
+  //     which logical param key it corresponds to (uniforms[i].key) — this
+  //     is what lets us go back to the params store and pull the right
+  //     slider value for each one.
+  //
+  // useMemo here matters for the same reason it mattered in ShaderPlane:
+  // we don't want to re-walk the graph and rebuild the shader string on
+  // every single render — only when the graph shape OR which node is
+  // selected as output actually changes. We deliberately do NOT include
+  // `getParams` results in this dependency array, because changing a
+  // slider should update *values*, not rebuild the *shader text* — that
+  // distinction is exactly why composeShader and the params-merging step
+  // below are two separate things.
+  // ---------------------------------------------------------------------
+  const composed = useMemo(
+    () => composeShader(outputNodeId, nodes, edges),
+    [outputNodeId, nodes, edges],
+  );
+
+  // ---------------------------------------------------------------------
+  // NEW: build the flat, namespaced params map that ShaderPlane expects.
+  //
+  // `composed.uniforms` tells us exactly which (nodeId, key) pairs the
+  // shader needs values for. For each one, we:
+  //   1. find that node's kind (to get its default values)
+  //   2. ask the params store for that node's CURRENT params (defaults
+  //      merged with whatever the user has dragged in ShaderControlsPanel)
+  //   3. write the value under the FINAL uniform name (key + nodeId), which
+  //      is what the composed shader's `uniform float uRotation_n5;`
+  //      declarations actually expect.
+  //
+  // This intentionally re-runs on every render (no useMemo) because it's
+  // cheap — it's just object lookups over a short list — and it MUST stay
+  // fresh every time any node's params change, which happens far more
+  // often than the graph shape itself changes.
+  // ---------------------------------------------------------------------
+  const activeParams: ParamsMap = {};
+  for (const uniform of composed.uniforms) {
+    const node = nodes.find((n) => n.id === uniform.nodeId);
+    if (!node) continue; // node got deleted mid-frame — skip it gracefully
+
+    const kind = getUVNodeKind((node.data as { kind?: string }).kind);
+    const defaults = getDefaultParams(kind);
+    const nodeParams = getParams(uniform.nodeId, defaults);
+
+    activeParams[uniform.uniformName] = nodeParams[uniform.key];
+  }
 
   const isOrtho = mode === "2d" || mode === "2d-to-3d";
   const isPerspective = mode === "3d" || mode === "auto";
@@ -180,10 +216,7 @@ export default function ShaderCanvas() {
   const restingPosition = useRef(new THREE.Vector3(10, -10, 8));
   // eslint-disable-next-line react-hooks/refs
   const restingPositionCurrent = useMemo(() => restingPosition.current, []);
-  // Fires when the user releases the mouse/finger after dragging OrbitControls.
-  // Only snap back in "3d" mode — this is the actual "rotates freely while
-  // dragging, then springs back on release" behavior you wanted, instead of
-  // the old every-frame force that blocked rotation entirely.
+
   const handleControlsEnd = () => {
     if (mode !== "3d" || !cameraRef.current || !controlsRef.current) return;
 
@@ -203,8 +236,10 @@ export default function ShaderCanvas() {
           cameraRef={cameraRef}
           restingPosition={restingPositionCurrent}
         />
+        {/* CHANGED: feed the composed shader + flat params instead of a
+            single node's kind/params. */}
         <ShaderPlane
-          fragmentShader={activeFragmentShader}
+          fragmentShader={composed.fragmentShader}
           params={activeParams}
         />
         {isPerspective && (
@@ -212,8 +247,6 @@ export default function ShaderCanvas() {
             args={[20, 20]}
             cellColor="#fff"
             sectionColor="#666"
-            // fadeFrom={5}
-            // fadeDistance={30}
             fadeStrength={15}
             rotation={[Math.PI / 2, 0, 0]}
           />
